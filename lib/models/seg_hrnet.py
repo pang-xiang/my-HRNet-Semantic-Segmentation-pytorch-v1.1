@@ -19,31 +19,38 @@ import torch.nn as nn
 import torch._utils
 import torch.nn.functional as F
 
+from .odconv import ODConv2d
+
 BatchNorm2d = nn.BatchNorm2d
 BN_MOMENTUM = 0.01
+ALIGN_CORNERS = None
 logger = logging.getLogger(__name__)
 
-def conv3x3(in_planes, out_planes, stride=1):
-    """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+def odconv3x3(in_planes, out_planes, stride=1, reduction=0.0625, kernel_num=4):
+    return ODConv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1,
+                    reduction=reduction, kernel_num=kernel_num)
+
+
+def odconv1x1(in_planes, out_planes, stride=1, reduction=0.0625, kernel_num=4):
+    return ODConv2d(in_planes, out_planes, kernel_size=1, stride=stride, padding=0,
+                    reduction=reduction, kernel_num=kernel_num)
 
 
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, reduction=0.0625, kernel_num=4):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.conv1 = odconv3x3(inplanes, planes, stride, reduction=reduction, kernel_num=kernel_num)
+        self.bn1 = nn.BatchNorm2d(planes,momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
-        self.bn2 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.conv2 = odconv3x3(planes, planes, reduction=reduction, kernel_num=kernel_num)
+        self.bn2 = nn.BatchNorm2d(planes,momentum=BN_MOMENTUM)
         self.downsample = downsample
         self.stride = stride
 
     def forward(self, x):
-        residual = x
+        identity = x
 
         out = self.conv1(x)
         out = self.bn1(out)
@@ -53,34 +60,61 @@ class BasicBlock(nn.Module):
         out = self.bn2(out)
 
         if self.downsample is not None:
-            residual = self.downsample(x)
+            identity = self.downsample(x)
 
-        out += residual
+        out += identity
         out = self.relu(out)
-
         return out
+
+# class BasicBlock(nn.Module):
+#     expansion = 1
+
+#     def __init__(self, inplanes, planes, stride=1, downsample=None):
+#         super(BasicBlock, self).__init__()
+#         self.conv1 = conv3x3(inplanes, planes, stride)
+#         self.bn1 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
+#         self.relu = nn.ReLU(inplace=True)
+#         self.conv2 = conv3x3(planes, planes)
+#         self.bn2 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
+#         self.downsample = downsample
+#         self.stride = stride
+
+#     def forward(self, x):
+#         residual = x
+
+#         out = self.conv1(x)
+#         out = self.bn1(out)
+#         out = self.relu(out)
+
+#         out = self.conv2(out)
+#         out = self.bn2(out)
+
+#         if self.downsample is not None:
+#             residual = self.downsample(x)
+
+#         out += residual
+#         out = self.relu(out)
+
+#         return out
 
 
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, reduction=0.0625, kernel_num=4):
         super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=1, bias=False)
-        self.bn2 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1,
-                               bias=False)
-        self.bn3 = BatchNorm2d(planes * self.expansion,
-                               momentum=BN_MOMENTUM)
+        self.conv1 = odconv1x1(inplanes, planes, reduction=reduction, kernel_num=kernel_num)
+        self.bn1 = nn.BatchNorm2d(planes,momentum=BN_MOMENTUM)
+        self.conv2 = odconv3x3(planes, planes, stride, reduction=reduction, kernel_num=kernel_num)
+        self.bn2 = nn.BatchNorm2d(planes,momentum=BN_MOMENTUM)
+        self.conv3 = odconv1x1(planes, planes * self.expansion, reduction=reduction, kernel_num=kernel_num)
+        self.bn3 = nn.BatchNorm2d(planes * self.expansion,momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
     def forward(self, x):
-        residual = x
+        identity = x
 
         out = self.conv1(x)
         out = self.bn1(out)
@@ -94,12 +128,51 @@ class Bottleneck(nn.Module):
         out = self.bn3(out)
 
         if self.downsample is not None:
-            residual = self.downsample(x)
+            identity = self.downsample(x)
 
-        out += residual
+        out += identity
         out = self.relu(out)
-
         return out
+
+# class Bottleneck(nn.Module):
+#     expansion = 4
+
+#     def __init__(self, inplanes, planes, stride=1, downsample=None):
+#         super(Bottleneck, self).__init__()
+#         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
+#         self.bn1 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
+#         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
+#                                padding=1, bias=False)
+#         self.bn2 = BatchNorm2d(planes, momentum=BN_MOMENTUM)
+#         self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1,
+#                                bias=False)
+#         self.bn3 = BatchNorm2d(planes * self.expansion,
+#                                momentum=BN_MOMENTUM)
+#         self.relu = nn.ReLU(inplace=True)
+#         self.downsample = downsample
+#         self.stride = stride
+
+#     def forward(self, x):
+#         residual = x
+
+#         out = self.conv1(x)
+#         out = self.bn1(out)
+#         out = self.relu(out)
+
+#         out = self.conv2(out)
+#         out = self.bn2(out)
+#         out = self.relu(out)
+
+#         out = self.conv3(out)
+#         out = self.bn3(out)
+
+#         if self.downsample is not None:
+#             residual = self.downsample(x)
+
+#         out += residual
+#         out = self.relu(out)
+
+#         return out
 
 
 class HighResolutionModule(nn.Module):
@@ -443,9 +516,13 @@ class HighResolutionNet(nn.Module):
 
         # Upsampling
         x0_h, x0_w = x[0].size(2), x[0].size(3)
-        x1 = F.upsample(x[1], size=(x0_h, x0_w), mode='bilinear')
-        x2 = F.upsample(x[2], size=(x0_h, x0_w), mode='bilinear')
-        x3 = F.upsample(x[3], size=(x0_h, x0_w), mode='bilinear')
+        # x1 = F.upsample(x[1], size=(x0_h, x0_w), mode='bilinear')
+        # x2 = F.upsample(x[2], size=(x0_h, x0_w), mode='bilinear')
+        # x3 = F.upsample(x[3], size=(x0_h, x0_w), mode='bilinear')
+        x1 = F.interpolate(x[1], size=(x0_h, x0_w), mode='bilinear', align_corners=ALIGN_CORNERS)
+        x2 = F.interpolate(x[2], size=(x0_h, x0_w), mode='bilinear', align_corners=ALIGN_CORNERS)
+        x3 = F.interpolate(x[3], size=(x0_h, x0_w), mode='bilinear', align_corners=ALIGN_CORNERS)
+        
 
         x = torch.cat([x[0], x1, x2, x3], 1)
 
