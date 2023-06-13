@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*/__pycache__
+*/__pycache__/*
+
+.vscode/
+
+
+# Pyre type checker
+.pyre/
+.idea/
+checkpoints/
+saved/
+output/
+pretrains
+tt_outputs
+*outputs*
+move.py
+*.ckpt
+*.pth
+data/cityscapes/*
+log/*
