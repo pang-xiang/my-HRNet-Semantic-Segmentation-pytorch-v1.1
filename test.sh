@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #在Cityscapes验证集vail上测试
-resume="output/oringin/cityscapes/seg_hrnet_w48_train_512x1024_sgd_lr1e-2_wd5e-4_bs_12_epoch484/final_state.pth"
+resume="output/ODConv/cityscapes/seg_hrnet_w48_train_512x1024_sgd_lr1e-2_wd5e-4_bs_12_epoch484/best.pth"
 
 python tools/test.py --cfg experiments/cityscapes/seg_hrnet_w48_train_512x1024_sgd_lr1e-2_wd5e-4_bs_12_epoch484.yaml \
                      TEST.MODEL_FILE $resume \
